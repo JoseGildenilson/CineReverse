@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 
 from app.core.config import settings
@@ -10,10 +11,17 @@ from app.routers import seat_map as seat_map_router
 from app.routers import reservation as reservation_router
 from app.routers import ticket as ticket_router
 
-
 app = FastAPI(
     title="CineReserve API",
     debug=settings.debug,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 app.include_router(user_router.router)
@@ -54,7 +62,7 @@ Backend do sistema de reservas do **Cinépolis Natal**.
 
 ### Autenticação
 
-Use o botão **Authorize** acima e insira seu token no formato:
+Use o botão **Authorize** einsira seu token no formato:
 ```
 Bearer <seu_token>
 ```

@@ -1,11 +1,17 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.cache import cache_get, cache_set, cache_delete_pattern
 from app.repositories import movie as movie_repo
 from app.schemas.movie import MovieCreate, MovieResponse
 
 
 async def list_movies(db: AsyncSession, page: int, page_size: int) -> dict:
+    cache_key = f"movies:page:{page}:size:{page_size}"
+    cached = await cache_get(cache_key)
+    if cached:
+        return cached
+
     skip = (page - 1) * page_size
     movies = await movie_repo.get_all(db, skip=skip, limit=page_size)
     total = await movie_repo.count(db)
@@ -22,14 +28,16 @@ async def list_movies(db: AsyncSession, page: int, page_size: int) -> dict:
             banner_url=movie.banner_url,
             has_sessions=sessions,
             available_seats=available_seats,
-        ))
+        ).model_dump())
 
-    return {
+    result = {
         "total": total,
         "page": page,
         "page_size": page_size,
         "items": items,
     }
+    await cache_set(cache_key, result)
+    return result
 
 
 async def create_movie(db: AsyncSession, data: MovieCreate) -> MovieResponse:
@@ -40,6 +48,7 @@ async def create_movie(db: AsyncSession, data: MovieCreate) -> MovieResponse:
         duration_minutes=data.duration_minutes,
         banner_url=data.banner_url,
     )
+    await cache_delete_pattern("movies:*")
     return MovieResponse(
         id=movie.id,
         title=movie.title,

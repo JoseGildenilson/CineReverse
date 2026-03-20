@@ -1,5 +1,6 @@
 import pytest
 import pytest_asyncio
+from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 
@@ -53,3 +54,21 @@ async def auth_client(client):
     token = response.json()["access_token"]
     client.headers.update({"Authorization": f"Bearer {token}"})
     return client
+
+
+@pytest.fixture(autouse=True)
+def mock_cache():
+    """Desabilita cache Redis em todos os testes."""
+    async def _empty_scan_iter(*args, **kwargs):
+        return
+        yield  # transforma em async generator
+
+    with patch("app.core.cache._get_redis") as mock_get_redis:
+        mock_redis = AsyncMock()
+        mock_redis.get = AsyncMock(return_value=None)
+        mock_redis.set = AsyncMock()
+        mock_redis.scan_iter = _empty_scan_iter
+        mock_redis.delete = AsyncMock()
+        mock_redis.aclose = AsyncMock()
+        mock_get_redis.return_value = mock_redis
+        yield mock_redis

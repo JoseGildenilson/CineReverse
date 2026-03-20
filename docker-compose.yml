@@ -1,12 +1,15 @@
 services:
-  db:
-    image: postgres:16
+
+  cinereserve-db:
+    image: postgres:16-alpine
+    container_name: cinereserve-db
+    restart: unless-stopped
     environment:
       POSTGRES_DB: cinereserve
       POSTGRES_USER: cine_user
       POSTGRES_PASSWORD: cine_pass
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - cinereserve_pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
     healthcheck:
@@ -14,9 +17,15 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - cinereserve-network
 
-  redis:
+  cinereserve-redis:
     image: redis:7-alpine
+    container_name: cinereserve-redis
+    restart: unless-stopped
+    volumes:
+      - cinereserve_redis:/data
     ports:
       - "6379:6379"
     healthcheck:
@@ -24,21 +33,37 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    networks:
+      - cinereserve-network
 
-  api:
-    build: .
+  cinereserve-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cinereserve-api
+    restart: unless-stopped
     command: >
       sh -c "alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000"
     ports:
       - "8000:8000"
     env_file:
-      - .env.docker
+      - .env
     depends_on:
-      db:
+      cinereserve-db:
         condition: service_healthy
-      redis:
+      cinereserve-redis:
         condition: service_healthy
+    networks:
+      - cinereserve-network
 
 volumes:
-  postgres_data:
+  cinereserve_pgdata:
+    name: cinereserve_pgdata
+  cinereserve_redis:
+    name: cinereserve_redis
+
+networks:
+  cinereserve-network:
+    name: cinereserve-network
+    driver: bridge
